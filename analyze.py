@@ -3,12 +3,14 @@
 import logging
 
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Cursor
 import pandas as pd
 
 logging.basicConfig(level=logging.NOTSET)
 
 DEFAULT_CITIES = ["austin", "tampa", "columbus", "phoenix", "releigh"]
 ZHVI_PATH = "data/zhvi_dec_2021.csv"
+ZORI_PATH = "data/zori_dec_2021.csv"
 
 
 def main() -> None:
@@ -16,12 +18,17 @@ def main() -> None:
 
     duplicate_cities = {}
     city_to_data = {}
-    # see https://www.zillow.com/research/data/ for more details
-    df = pd.read_csv(ZHVI_PATH)
-    df_raw = df.drop(
+    # see https://www.zillow.com/research/data/ for more details on the data
+    zhvi_df = pd.read_csv(ZHVI_PATH)
+    zori_df = pd.read_csv(ZORI_PATH)
+    zhvi_df_raw = zhvi_df.drop(
         ["RegionName", "RegionID", "RegionType", "StateName", "SizeRank"], axis=1
     )
-    for idx, row in df.iterrows():
+    # consistent data format with ZORI
+    zhvi_df_raw = zhvi_df_raw.rename(columns=lambda col: col[:-3])
+    zori_df_raw = zori_df.drop(["RegionName", "RegionID", "SizeRank"], axis=1)
+
+    for idx, row in zhvi_df.iterrows():
         full_name = row["RegionName"]
         if full_name == "United States":
             continue
@@ -34,19 +41,25 @@ def main() -> None:
             duplicate_cities[city] = 1
             if should_skip_duplicate(city, state):
                 continue
+        # re: 98, ZORI only contains 100 rows of ZHVI (including labels row and "United States")
         city_to_data[city] = {
             "size_rank": row["SizeRank"],
             "state": state,
-            "zhvi": df_raw.iloc[idx],
+            "zhvi": zhvi_df_raw.iloc[idx],
+            "zori": zori_df_raw.iloc[idx] if idx < 98 else None,
+            "price-to-rent": zhvi_df_raw.iloc[idx].div(zori_df_raw.iloc[idx]).div(12)
+            if idx < 98
+            else None,
         }
 
     logging.info("Finished processing data.")
 
     logging.info("Starting interactive loop...")
-    plt.ion()
-    plt.show()
+    # plt.ion()
+    # plt.show()
     new_city_list = []
     while True:
+        figure, axis = plt.subplots(2, 2)
         raw_input = input("Cities or q?\n")
         if raw_input == "q":
             logging.info("Bye")
@@ -61,22 +74,28 @@ def main() -> None:
             continue
         else:
             city_list = [c.strip() for c in raw_input.split(",")]
-        ax = None
+
+        logging.info("Plotting data...")
         for city in city_list:
             if not city.lower() in city_to_data:
                 logging.warning(f"{city} does not exist in data.")
                 continue
             if city.lower() in duplicate_cities:
                 logging.warning(f"{city} has duplicate entries in dataset.")
+
+            city_to_data[city]["zhvi"].plot(ax=axis[0, 0])
+            axis[0, 0].set_title("Home value index")
+            city_to_data[city]["zori"].plot(ax=axis[0, 1])
+            axis[0, 1].set_title("Rental index")
+            city_to_data[city]["price-to-rent"].plot(ax=axis[1, 0])
+            axis[1, 0].set_title("Price-to-rent")
+
             new_city_list.append(city)
-            if ax is None:
-                ax = city_to_data[city]["zhvi"].plot()
-            else:
-                ax = city_to_data[city]["zhvi"].plot(ax=ax)
-        logging.info("Plotting data...")
-        plt.legend(new_city_list)
-        plt.draw()
-        plt.pause(0.001)
+            figure.legend(new_city_list)
+
+        plt.show()
+        # plt.draw()
+        # plt.pause(0.001)
 
 
 def should_skip_duplicate(city: str, state: str) -> bool:
