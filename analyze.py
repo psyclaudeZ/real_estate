@@ -3,7 +3,8 @@
 import logging
 
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Cursor
+import matplotlib.ticker as ticker
+import numpy as np
 import pandas as pd
 
 logging.basicConfig(level=logging.NOTSET)
@@ -55,11 +56,10 @@ def main() -> None:
     logging.info("Finished processing data.")
 
     logging.info("Starting interactive loop...")
-    # plt.ion()
-    # plt.show()
+    figure, axis = plt.subplots(2, 2, figsize=(12, 10))
+    plt.ion()
     new_city_list = []
     while True:
-        figure, axis = plt.subplots(2, 2)
         raw_input = input("Cities or q?\n")
         if raw_input == "q":
             logging.info("Bye")
@@ -84,18 +84,24 @@ def main() -> None:
                 logging.warning(f"{city} has duplicate entries in dataset.")
 
             city_to_data[city]["zhvi"].plot(ax=axis[0, 0])
+            axis[0, 0].yaxis.set_major_locator(ticker.MultipleLocator(25000))
+            axis[0, 0].yaxis.grid()
             axis[0, 0].set_title("Home value index")
+
             city_to_data[city]["zori"].plot(ax=axis[0, 1])
+            axis[0, 1].yaxis.set_major_locator(ticker.MultipleLocator(125))
+            axis[0, 1].yaxis.grid(True)
             axis[0, 1].set_title("Rental index")
+
             city_to_data[city]["price-to-rent"].plot(ax=axis[1, 0])
+            axis[1, 0].yaxis.set_major_locator(ticker.MultipleLocator(2.5))
+            axis[1, 0].yaxis.grid(True)
             axis[1, 0].set_title("Price-to-rent")
 
             new_city_list.append(city)
             figure.legend(new_city_list)
-
-        plt.show()
-        # plt.draw()
-        # plt.pause(0.001)
+            plt.draw()
+            plt.pause(0.001)
 
 
 def should_skip_duplicate(city: str, state: str) -> bool:
