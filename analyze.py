@@ -110,6 +110,8 @@ def should_skip_duplicate(city: str, state: str) -> bool:
         return True
     if city == "dayton" and state != "OH":
         return True
+    if city == "jacksonville" and state != "FL":
+        return True
     return False
 
 
